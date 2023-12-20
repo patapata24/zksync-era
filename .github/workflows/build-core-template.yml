@@ -37,12 +37,18 @@ jobs:
     runs-on: [matterlabs-ci-runner]
     strategy:
       matrix:
-        component:
-          - server-v2
-          - external-node
-          - contract-verifier
-          - cross-external-nodes-checker
-          - snapshots-creator
+          component:
+          - name: server-v2
+            platforms: linux/amd64
+          - name: external-node
+            platforms: linux/amd64,linux/arm64
+          - name: contract-verifier
+            platforms: linux/amd64
+          - name: cross-external-nodes-checker
+            platforms: linux/amd64
+          - name: snapshots-creator
+            platforms: linux/amd64
+
     steps:
       - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
         with:
@@ -105,10 +111,11 @@ jobs:
       - name: update-images
         env:
           DOCKER_ACTION: ${{ inputs.action }}
-          COMPONENT: ${{ matrix.component }}
+          COMPONENT: ${{ matrix.component.name }}
+          PLATFORMS: ${{ matrix.component.platforms }}
         run: |
           ci_run rustup default nightly-2023-08-21
-          ci_run zk docker $DOCKER_ACTION $COMPONENT
+          ci_run zk docker $DOCKER_ACTION --platforms=${PLATFORMS} $COMPONENT
       - name: Show sccache stats
         if: always()
         run: |
