@@ -167,15 +167,13 @@ export const command = new Command('docker').description('docker management');
 command
     .command('build <image>')
     .option('--custom-tag <value>', 'Custom tag for image')
-    .option('--platforms <platforms>', 'Comma-separated list of platforms',
-        (val) => val.split(','), ['linux/amd64'])
+    .option('--platforms <platforms>', 'Comma-separated list of platforms', (val) => val.split(','), ['linux/amd64'])
     .description('build docker image')
     .action(build);
 command
     .command('push <image>')
     .option('--custom-tag <value>', 'Custom tag for image')
-    .option('--platforms <platforms>', 'Comma-separated list of platforms',
-        (val) => val.split(','), ['linux/amd64'])
+    .option('--platforms <platforms>', 'Comma-separated list of platforms', (val) => val.split(','), ['linux/amd64'])
     .action(push);
 command.command('pull').description('pull all containers').action(pull);
 command.command('restart <container>').description('restart container in docker-compose.yml').action(restart);
