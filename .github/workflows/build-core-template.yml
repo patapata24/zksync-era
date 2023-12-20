@@ -99,6 +99,7 @@ jobs:
           ci_run git config --global --add safe.directory /usr/src/zksync/sdk/binaryen
           ci_run git config --global --add safe.directory /usr/src/zksync/contracts/system-contracts
           ci_run git config --global --add safe.directory /usr/src/zksync/contracts
+          ci_run docker buildx create --name multiarch --use
           ci_run zk
           ci_run zk clean --all
           ci_run zk run yarn
