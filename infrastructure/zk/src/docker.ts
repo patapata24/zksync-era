@@ -20,11 +20,13 @@ const IMAGES = [
     'proof-fri-compressor',
     'snapshots-creator'
 ];
+
 const UNIX_TIMESTAMP = Date.now();
 
 async function dockerCommand(
     command: 'push' | 'build',
     image: string,
+    platforms: string[] = ['linux/amd64'],
     customTag?: string,
     dockerOrg: string = 'matterlabs'
 ) {
@@ -37,8 +39,8 @@ async function dockerCommand(
 
     // We want an alternative flow for Rust image
     if (image == 'rust') {
-        await dockerCommand(command, 'server-v2', customTag, dockerOrg);
-        await dockerCommand(command, 'prover', customTag, dockerOrg);
+        await dockerCommand(command, 'server-v2', platforms, customTag, dockerOrg);
+        await dockerCommand(command, 'prover', platforms, customTag, dockerOrg);
         return;
     }
     if (!IMAGES.includes(image)) {
@@ -54,10 +56,10 @@ async function dockerCommand(
     // Main build\push flow
     switch (command) {
         case 'build':
-            await _build(image, tagList, dockerOrg);
+            await _build(image, tagList, dockerOrg, platforms);
             break;
         case 'push':
-            await _push(image, tagList);
+            await _push(image, tagList, platforms);
             break;
         default:
             console.log(`Unknown command for docker ${command}.`);
@@ -88,7 +90,7 @@ function defaultTagList(image: string, imageTagSha: string, imageTagShaTS: strin
     return tagList;
 }
 
-async function _build(image: string, tagList: string[], dockerOrg: string) {
+async function _build(image: string, tagList: string[], dockerOrg: string, platforms: string[]) {
     if (image === 'server-v2' || image === 'external-node' || image === 'prover') {
         await contract.build();
     }
@@ -109,14 +111,14 @@ async function _build(image: string, tagList: string[], dockerOrg: string) {
     const imagePath = image == 'prover-v2' ? 'prover' : image;
 
     const buildCommand =
-        `DOCKER_BUILDKIT=1 docker build ${tagsToBuild}` +
-        (buildArgs ? ` ${buildArgs}` : '') +
+        `DOCKER_BUILDKIT=1 docker buildx build ${tagsToBuild}` +
+        ` --platform=${platforms.join(',')}` + (buildArgs ? ` ${buildArgs}` : '') +
         ` -f ./docker/${imagePath}/Dockerfile .`;
 
     await utils.spawn(buildCommand);
 }
 
-async function _push(image: string, tagList: string[]) {
+async function _push(image: string, tagList: string[], platforms: string[]) {
     // For development purposes, we want to use `2.0` tags for 2.0 images, just to not interfere with 1.x
 
     for (const tag of tagList) {
@@ -140,16 +142,16 @@ async function _push(image: string, tagList: string[]) {
 }
 
 export async function build(image: string, cmd: Command) {
-    await dockerCommand('build', image, cmd.customTag);
+    await dockerCommand('build', image,  cmd.platforms, cmd.customTag);
 }
 
 export async function customBuildForHyperchain(image: string, dockerOrg: string) {
-    await dockerCommand('build', image, '', dockerOrg);
+    await dockerCommand('build', image, [], dockerOrg);
 }
 
 export async function push(image: string, cmd: Command) {
-    await dockerCommand('build', image, cmd.customTag);
-    await dockerCommand('push', image, cmd.customTag);
+    await dockerCommand('build', image, cmd.platforms, cmd.customTag);
+    await dockerCommand('push', image, cmd.platforms, cmd.customTag);
 }
 
 export async function restart(container: string) {
@@ -165,12 +167,15 @@ export const command = new Command('docker').description('docker management');
 command
     .command('build <image>')
     .option('--custom-tag <value>', 'Custom tag for image')
+    .option('--platforms <platforms>', 'Comma-separated list of platforms',
+        (val) => val.split(','), ['linux/amd64'])
     .description('build docker image')
     .action(build);
 command
     .command('push <image>')
     .option('--custom-tag <value>', 'Custom tag for image')
-    .description('build and push docker image')
+    .option('--platforms <platforms>', 'Comma-separated list of platforms',
+        (val) => val.split(','), ['linux/amd64'])
     .action(push);
 command.command('pull').description('pull all containers').action(pull);
 command.command('restart <container>').description('restart container in docker-compose.yml').action(restart);
