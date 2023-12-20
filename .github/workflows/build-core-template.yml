@@ -120,7 +120,6 @@ jobs:
           COMPONENT: ${{ matrix.component.name }}
           PLATFORMS: ${{ matrix.component.platforms }}
         run: |
-          sleep 360
           ci_run rustup default nightly-2023-08-21
           ci_run zk docker $DOCKER_ACTION --platforms=${PLATFORMS} $COMPONENT
       - name: Show sccache stats
