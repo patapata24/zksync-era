@@ -103,24 +103,17 @@ async function _build(
 
     let tagsToBuild = '';
 
-    const addTag = (registry: string) => {
-        tagsToBuild += `-t ${registry}/${image}:${tag} `;
-    };
-
-    const addRegistryTags = () => {
-        for (const tag of tagList) {
-            DOCKER_REGISTRIES.forEach(addTag);
-            if (image === 'circuit-synthesizer') {
-                const additionalRegistries = [
-                    'europe-docker.pkg.dev/matterlabs-infra/matterlabs-docker',
-                    'asia-docker.pkg.dev/matterlabs-infra/matterlabs-docker'
-                ];
-                additionalRegistries.forEach((registry) => addTag(registry));
-            }
+    for (const tag of tagList) {
+        for (const registry of DOCKER_REGISTRIES) {
+            tagsToBuild = tagsToBuild + `-t ${registry}/${image}:${tag} `;
         }
-    };
-
-    addRegistryTags();
+        if (image == 'circuit-synthesizer') {
+            tagsToBuild =
+                tagsToBuild +
+                `-t europe-docker.pkg.dev/matterlabs-infra/matterlabs-docker/${image}:${tag} ` +
+                `-t asia-docker.pkg.dev/matterlabs-infra/matterlabs-docker/${image}:${tag} `;
+        }
+    }
 
     let buildArgs = '';
     if (image === 'prover-v2') {
