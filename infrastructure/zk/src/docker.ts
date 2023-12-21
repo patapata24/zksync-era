@@ -107,12 +107,6 @@ async function _build(
         for (const registry of DOCKER_REGISTRIES) {
             tagsToBuild = tagsToBuild + `-t ${registry}/${image}:${tag} `;
         }
-        if (image == 'circuit-synthesizer') {
-            tagsToBuild =
-                tagsToBuild +
-                `-t europe-docker.pkg.dev/matterlabs-infra/matterlabs-docker/${image}:${tag} ` +
-                `-t asia-docker.pkg.dev/matterlabs-infra/matterlabs-docker/${image}:${tag} `;
-        }
     }
 
     let buildArgs = '';
