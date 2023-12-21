@@ -41,7 +41,7 @@ jobs:
           - name: server-v2
             platforms: linux/amd64
           - name: external-node
-            platforms: linux/amd64,linux/arm64
+            platforms: linux/arm64
           - name: contract-verifier
             platforms: linux/amd64
           - name: cross-external-nodes-checker
