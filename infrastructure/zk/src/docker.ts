@@ -21,6 +21,8 @@ const IMAGES = [
     'snapshots-creator'
 ];
 
+const DOCKER_REGISTRIES = ['us-docker.pkg.dev/matterlabs-infra/matterlabs-docker', 'matterlabs'];
+
 const UNIX_TIMESTAMP = Date.now();
 
 async function dockerCommand(
@@ -28,6 +30,7 @@ async function dockerCommand(
     image: string,
     platforms: string[] = ['linux/amd64'],
     customTag?: string,
+    buildExtraArgs: string = '',
     dockerOrg: string = 'matterlabs'
 ) {
     // Generating all tags for containers. We need 2 tags here: SHA and SHA+TS
@@ -56,10 +59,7 @@ async function dockerCommand(
     // Main build\push flow
     switch (command) {
         case 'build':
-            await _build(image, tagList, dockerOrg, platforms);
-            break;
-        case 'push':
-            await _push(image, tagList, platforms);
+            await _build(image, tagList, dockerOrg, platforms, buildExtraArgs);
             break;
         default:
             console.log(`Unknown command for docker ${command}.`);
@@ -90,14 +90,30 @@ function defaultTagList(image: string, imageTagSha: string, imageTagShaTS: strin
     return tagList;
 }
 
-async function _build(image: string, tagList: string[], dockerOrg: string, platforms: string[]) {
+async function _build(
+    image: string,
+    tagList: string[],
+    dockerOrg: string,
+    platforms: string[],
+    extraArgs: string = ''
+) {
     if (image === 'server-v2' || image === 'external-node' || image === 'prover') {
         await contract.build();
     }
     let tagsToBuild = '';
 
     // generate list of tags for image - we want 3 tags (latest, SHA, SHA+TimeStamp) for listed components and only "latest" for everything else
-    tagsToBuild = tagList.map((tag) => `-t ${dockerOrg}/${image}:${tag}`).join(' ');
+    for (const tag of tagList) {
+        for (const registry of DOCKER_REGISTRIES) {
+            tagsToBuild = tagsToBuild + `-t ${registry}/${image}:${tag} `;
+        }
+        if (image == 'circuit-synthesizer') {
+            tagsToBuild =
+                tagsToBuild +
+                `-t europe-docker.pkg.dev/matterlabs-infra/matterlabs-docker/${image}:${tag} ` +
+                `-t asia-docker.pkg.dev/matterlabs-infra/matterlabs-docker/${image}:${tag} `;
+        }
+    }
 
     // Conditionally add build argument if image is prover-v2
     let buildArgs = '';
@@ -105,6 +121,7 @@ async function _build(image: string, tagList: string[], dockerOrg: string, platf
         const eraBellmanCudaRelease = process.env.ERA_BELLMAN_CUDA_RELEASE;
         buildArgs = `--build-arg ERA_BELLMAN_CUDA_RELEASE=${eraBellmanCudaRelease}`;
     }
+    buildArgs = buildArgs + extraArgs;
 
     // HACK
     // For prover-v2 which is not a prover, but should be built from the prover dockerfile. So here we go.
@@ -119,29 +136,6 @@ async function _build(image: string, tagList: string[], dockerOrg: string, platf
     await utils.spawn(buildCommand);
 }
 
-async function _push(image: string, tagList: string[], platforms: string[]) {
-    // For development purposes, we want to use `2.0` tags for 2.0 images, just to not interfere with 1.x
-
-    for (const tag of tagList) {
-        await utils.spawn(`docker push matterlabs/${image}:${tag}`);
-        await utils.spawn(
-            `docker tag matterlabs/${image}:${tag} us-docker.pkg.dev/matterlabs-infra/matterlabs-docker/${image}:${tag}`
-        );
-        await utils.spawn(`docker push us-docker.pkg.dev/matterlabs-infra/matterlabs-docker/${image}:${tag}`);
-
-        if (image == 'circuit-synthesizer') {
-            await utils.spawn(
-                `docker tag us-docker.pkg.dev/matterlabs-infra/matterlabs-docker/${image}:${tag} asia-docker.pkg.dev/matterlabs-infra/matterlabs-docker/${image}:${tag}`
-            );
-            await utils.spawn(
-                `docker tag us-docker.pkg.dev/matterlabs-infra/matterlabs-docker/${image}:${tag} europe-docker.pkg.dev/matterlabs-infra/matterlabs-docker/${image}:${tag}`
-            );
-            await utils.spawn(`docker push asia-docker.pkg.dev/matterlabs-infra/matterlabs-docker/${image}:${tag}`);
-            await utils.spawn(`docker push europe-docker.pkg.dev/matterlabs-infra/matterlabs-docker/${image}:${tag}`);
-        }
-    }
-}
-
 export async function build(image: string, cmd: Command) {
     await dockerCommand('build', image, cmd.platforms, cmd.customTag);
 }
@@ -151,8 +145,7 @@ export async function customBuildForHyperchain(image: string, dockerOrg: string)
 }
 
 export async function push(image: string, cmd: Command) {
-    await dockerCommand('build', image, cmd.platforms, cmd.customTag);
-    await dockerCommand('push', image, cmd.platforms, cmd.customTag);
+    await dockerCommand('build', image, cmd.platforms, cmd.customTag, '--push');
 }
 
 export async function restart(container: string) {
