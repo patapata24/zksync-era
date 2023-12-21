@@ -97,35 +97,39 @@ async function _build(
     platforms: string[],
     extraArgs: string = ''
 ) {
-    if (image === 'server-v2' || image === 'external-node' || image === 'prover') {
+    if (['server-v2', 'external-node', 'prover'].includes(image)) {
         await contract.build();
     }
+
     let tagsToBuild = '';
 
-    // generate list of tags for image - we want 3 tags (latest, SHA, SHA+TimeStamp) for listed components and only "latest" for everything else
-    for (const tag of tagList) {
-        for (const registry of DOCKER_REGISTRIES) {
-            tagsToBuild = tagsToBuild + `-t ${registry}/${image}:${tag} `;
-        }
-        if (image == 'circuit-synthesizer') {
-            tagsToBuild =
-                tagsToBuild +
-                `-t europe-docker.pkg.dev/matterlabs-infra/matterlabs-docker/${image}:${tag} ` +
-                `-t asia-docker.pkg.dev/matterlabs-infra/matterlabs-docker/${image}:${tag} `;
-        }
-    }
+    const addTag = (registry: string) => {
+        tagsToBuild += `-t ${registry}/${image}:${tag} `;
+    };
 
-    // Conditionally add build argument if image is prover-v2
+    const addRegistryTags = () => {
+        for (const tag of tagList) {
+            DOCKER_REGISTRIES.forEach(addTag);
+            if (image === 'circuit-synthesizer') {
+                const additionalRegistries = [
+                    'europe-docker.pkg.dev/matterlabs-infra/matterlabs-docker',
+                    'asia-docker.pkg.dev/matterlabs-infra/matterlabs-docker'
+                ];
+                additionalRegistries.forEach((registry) => addTag(registry));
+            }
+        }
+    };
+
+    addRegistryTags();
+
     let buildArgs = '';
     if (image === 'prover-v2') {
         const eraBellmanCudaRelease = process.env.ERA_BELLMAN_CUDA_RELEASE;
         buildArgs = `--build-arg ERA_BELLMAN_CUDA_RELEASE=${eraBellmanCudaRelease}`;
     }
-    buildArgs = buildArgs + extraArgs;
+    buildArgs += extraArgs;
 
-    // HACK
-    // For prover-v2 which is not a prover, but should be built from the prover dockerfile. So here we go.
-    const imagePath = image == 'prover-v2' ? 'prover' : image;
+    const imagePath = image === 'prover-v2' ? 'prover' : image;
 
     const buildCommand =
         `DOCKER_BUILDKIT=1 docker buildx build ${tagsToBuild}` +
