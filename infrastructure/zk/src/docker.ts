@@ -112,7 +112,11 @@ async function _build(
     let buildArgs = '';
     if (image === 'prover-v2') {
         const eraBellmanCudaRelease = process.env.ERA_BELLMAN_CUDA_RELEASE;
-        buildArgs = `--build-arg ERA_BELLMAN_CUDA_RELEASE=${eraBellmanCudaRelease}`;
+        buildArgs += `--build-arg ERA_BELLMAN_CUDA_RELEASE=${eraBellmanCudaRelease}`;
+    }
+    if (image === 'prover-gpu-fri') {
+        const cudaArch = process.env.CUDA_ARCH;
+        buildArgs += `--build-arg CUDA_ARCH='${cudaArch}'`;
     }
     buildArgs += extraArgs;
 
