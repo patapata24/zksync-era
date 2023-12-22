@@ -98,7 +98,8 @@ async fn build_state_keeper(
 async fn init_tasks(
     config: ExternalNodeConfig,
     connection_pool: ConnectionPool,
-    rpc_connection_pool: ConnectionPool,
+    rpc_connection_pool_http: ConnectionPool,
+    rpc_connection_pool_ws: ConnectionPool,
 ) -> anyhow::Result<(
     Vec<task::JoinHandle<anyhow::Result<()>>>,
     watch::Sender<bool>,
@@ -271,7 +272,7 @@ async fn init_tasks(
     };
 
     let http_server_handles =
-        ApiBuilder::jsonrpsee_backend(config.clone().into(), rpc_connection_pool.clone())
+        ApiBuilder::jsonrpsee_backend(config.clone().into(), rpc_connection_pool_http.clone())
             .http(config.required.http_port)
             .with_filter_limit(config.optional.filters_limit)
             .with_batch_request_size_limit(config.optional.max_batch_request_size)
@@ -285,7 +286,7 @@ async fn init_tasks(
             .context("Failed initializing HTTP JSON-RPC server")?;
 
     let ws_server_handles =
-        ApiBuilder::jsonrpsee_backend(config.clone().into(), rpc_connection_pool.clone())
+        ApiBuilder::jsonrpsee_backend(config.clone().into(), rpc_connection_pool_ws.clone())
             .ws(config.required.ws_port)
             .with_filter_limit(config.optional.filters_limit)
             .with_subscriptions_limit(config.optional.subscriptions_limit)
@@ -391,7 +392,15 @@ async fn main() -> anyhow::Result<()> {
     .await
     .context("failed to build a connection_pool")?;
 
-    let rpc_connection_pool = ConnectionPool::builder(
+    let rpc_connection_pool_http = ConnectionPool::builder(
+        &config.postgres.database_url,
+        config.postgres.max_connections,
+    )
+    .build()
+    .await
+    .context("failed to build a connection_pool")?;
+
+    let rpc_connection_pool_ws = ConnectionPool::builder(
         &config.postgres.database_url,
         config.postgres.max_connections,
     )
@@ -450,10 +459,14 @@ async fn main() -> anyhow::Result<()> {
     .await
     .context("Performing genesis failed")?;
 
-    let (task_handles, stop_sender, health_check_handle, stop_receiver) =
-        init_tasks(config.clone(), connection_pool.clone(), rpc_connection_pool)
-            .await
-            .context("init_tasks")?;
+    let (task_handles, stop_sender, health_check_handle, stop_receiver) = init_tasks(
+        config.clone(),
+        connection_pool.clone(),
+        rpc_connection_pool_http,
+        rpc_connection_pool_ws,
+    )
+    .await
+    .context("init_tasks")?;
 
     let reorg_detector = ReorgDetector::new(&main_node_url, connection_pool.clone(), stop_receiver);
     let mut reorg_detector_handle = tokio::spawn(reorg_detector.run()).fuse();
