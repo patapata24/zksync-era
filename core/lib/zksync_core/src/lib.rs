@@ -297,6 +297,27 @@ pub async fn initialize_components(
             .build()
             .await
             .context("failed to build replica_connection_pool")?;
+    let connection_pool_http = ConnectionPool::builder(postgres_config.master_url()?, pool_size)
+        .build()
+        .await
+        .context("failed to build connection_pool")?;
+    let replica_connection_pool_http =
+        ConnectionPool::builder(postgres_config.replica_url()?, pool_size)
+            .set_statement_timeout(statement_timeout)
+            .build()
+            .await
+            .context("failed to build replica_connection_pool")?;
+
+    let connection_pool_ws = ConnectionPool::builder(postgres_config.master_url()?, pool_size)
+        .build()
+        .await
+        .context("failed to build connection_pool")?;
+    let replica_connection_pool_ws =
+        ConnectionPool::builder(postgres_config.replica_url()?, pool_size)
+            .set_statement_timeout(statement_timeout)
+            .build()
+            .await
+            .context("failed to build replica_connection_pool")?;
 
     let mut healthchecks: Vec<Box<dyn CheckHealth>> = Vec::new();
     let contracts_config = configs
@@ -398,8 +419,8 @@ pub async fn initialize_components(
                 &state_keeper_config,
                 &internal_api_config,
                 &api_config,
-                connection_pool.clone(),
-                replica_connection_pool.clone(),
+                connection_pool_http,
+                replica_connection_pool_http,
                 stop_receiver.clone(),
                 bounded_gas_adjuster.clone(),
                 state_keeper_config.save_call_traces,
@@ -438,8 +459,8 @@ pub async fn initialize_components(
                 &internal_api_config,
                 &api_config,
                 bounded_gas_adjuster.clone(),
-                connection_pool.clone(),
-                replica_connection_pool.clone(),
+                connection_pool_ws,
+                replica_connection_pool_ws,
                 stop_receiver.clone(),
                 storage_caches,
             )
