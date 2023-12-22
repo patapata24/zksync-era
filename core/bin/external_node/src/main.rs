@@ -98,6 +98,7 @@ async fn build_state_keeper(
 async fn init_tasks(
     config: ExternalNodeConfig,
     connection_pool: ConnectionPool,
+    rpc_connection_pool: ConnectionPool,
 ) -> anyhow::Result<(
     Vec<task::JoinHandle<anyhow::Result<()>>>,
     watch::Sender<bool>,
@@ -270,7 +271,7 @@ async fn init_tasks(
     };
 
     let http_server_handles =
-        ApiBuilder::jsonrpsee_backend(config.clone().into(), connection_pool.clone())
+        ApiBuilder::jsonrpsee_backend(config.clone().into(), rpc_connection_pool.clone())
             .http(config.required.http_port)
             .with_filter_limit(config.optional.filters_limit)
             .with_batch_request_size_limit(config.optional.max_batch_request_size)
@@ -284,7 +285,7 @@ async fn init_tasks(
             .context("Failed initializing HTTP JSON-RPC server")?;
 
     let ws_server_handles =
-        ApiBuilder::jsonrpsee_backend(config.clone().into(), connection_pool.clone())
+        ApiBuilder::jsonrpsee_backend(config.clone().into(), rpc_connection_pool.clone())
             .ws(config.required.ws_port)
             .with_filter_limit(config.optional.filters_limit)
             .with_subscriptions_limit(config.optional.subscriptions_limit)
@@ -390,6 +391,14 @@ async fn main() -> anyhow::Result<()> {
     .await
     .context("failed to build a connection_pool")?;
 
+    let rpc_connection_pool = ConnectionPool::builder(
+        &config.postgres.database_url,
+        config.postgres.max_connections,
+    )
+    .build()
+    .await
+    .context("failed to build a connection_pool")?;
+
     let reverter_connection_pool = ConnectionPool::builder(&config.postgres.database_url, 1)
         .build()
         .await
@@ -442,7 +451,7 @@ async fn main() -> anyhow::Result<()> {
     .context("Performing genesis failed")?;
 
     let (task_handles, stop_sender, health_check_handle, stop_receiver) =
-        init_tasks(config.clone(), connection_pool.clone())
+        init_tasks(config.clone(), connection_pool.clone(), rpc_connection_pool)
             .await
             .context("init_tasks")?;
 
