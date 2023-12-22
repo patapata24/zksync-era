@@ -72,6 +72,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: contracts
+          path: ./contracts/
 
       - name: start-services
         run: |
