@@ -73,11 +73,6 @@ jobs:
         with:
           name: contracts
 
-      - name: Display structure of downloaded files
-        run: |
-          ls -R
-          ls -R contracts
-
       - name: start-services
         run: |
           echo "IMAGE_TAG_SUFFIX=${{ env.IMAGE_TAG_SUFFIX }}" >> .env
