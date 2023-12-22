@@ -390,6 +390,11 @@ async fn main() -> anyhow::Result<()> {
     .await
     .context("failed to build a connection_pool")?;
 
+    let reverter_connection_pool = ConnectionPool::builder(&config.postgres.database_url, 1)
+        .build()
+        .await
+        .context("failed to build a reverter_connection_pool")?;
+
     if opt.revert_pending_l1_batch {
         tracing::info!("Rolling pending L1 batch back..");
         let reverter = BlockReverter::new(
@@ -486,7 +491,7 @@ async fn main() -> anyhow::Result<()> {
             config.required.state_cache_path,
             config.required.merkle_tree_path,
             None,
-            connection_pool,
+            reverter_connection_pool,
             L1ExecutedBatchesRevert::Allowed,
         );
         reverter
