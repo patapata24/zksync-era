@@ -444,7 +444,6 @@ impl<G: 'static + Send + Sync + L1GasPriceProvider> FullApiParams<G> {
             }
 
             tasks.extend(pub_sub.spawn_notifiers(
-                runtime.handle(),
                 self.pool.clone(),
                 self.polling_interval,
                 stop_receiver.clone(),

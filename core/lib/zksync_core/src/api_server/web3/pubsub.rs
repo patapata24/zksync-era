@@ -409,7 +409,6 @@ impl EthSubscribe {
     /// Spawns notifier tasks. This should be called once per instance.
     pub fn spawn_notifiers(
         &self,
-        handle: &tokio::runtime::Handle,
         connection_pool: ConnectionPool,
         polling_interval: Duration,
         stop_receiver: watch::Receiver<bool>,
@@ -422,7 +421,7 @@ impl EthSubscribe {
             polling_interval,
             events_sender: self.events_sender.clone(),
         };
-        let notifier_task = handle.spawn(notifier.notify_blocks(stop_receiver.clone()));
+        let notifier_task = tokio::spawn(notifier.notify_blocks(stop_receiver.clone()));
         notifier_tasks.push(notifier_task);
 
         let notifier = PubSubNotifier {
@@ -431,7 +430,7 @@ impl EthSubscribe {
             polling_interval,
             events_sender: self.events_sender.clone(),
         };
-        let notifier_task = handle.spawn(notifier.notify_txs(stop_receiver.clone()));
+        let notifier_task = tokio::spawn(notifier.notify_txs(stop_receiver.clone()));
         notifier_tasks.push(notifier_task);
 
         let notifier = PubSubNotifier {
@@ -440,7 +439,7 @@ impl EthSubscribe {
             polling_interval,
             events_sender: self.events_sender.clone(),
         };
-        let notifier_task = handle.spawn(notifier.notify_logs(stop_receiver));
+        let notifier_task = tokio::spawn(notifier.notify_logs(stop_receiver));
 
         notifier_tasks.push(notifier_task);
         notifier_tasks
