@@ -424,15 +424,6 @@ impl<G: 'static + Send + Sync + L1GasPriceProvider> FullApiParams<G> {
         let websocket_requests_per_minute_limit = self.optional.websocket_requests_per_minute_limit;
         let subscriptions_limit = self.optional.subscriptions_limit;
 
-        let runtime = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .thread_name(runtime_thread_name)
-            .worker_threads(self.threads)
-            .build()
-            .with_context(|| {
-                format!("Failed creating Tokio runtime for {health_check_name} jsonrpsee server")
-            })?;
-
         let mut tasks = vec![];
         let mut pubsub = None;
         if matches!(transport, ApiTransport::WebSocket(_))
@@ -454,22 +445,18 @@ impl<G: 'static + Send + Sync + L1GasPriceProvider> FullApiParams<G> {
         let rpc = self.build_rpc_module(pubsub).await;
         // Start the server in a separate tokio runtime from a dedicated thread.
         let (local_addr_sender, local_addr) = oneshot::channel();
-        let server_task = tokio::task::spawn_blocking(move || {
-            let res = runtime.block_on(Self::run_jsonrpsee_server(
-                rpc,
-                transport,
-                stop_receiver,
-                local_addr_sender,
-                health_updater,
-                vm_barrier,
-                batch_request_config,
-                response_body_size_limit,
-                subscriptions_limit,
-                websocket_requests_per_minute_limit,
-            ));
-            runtime.shutdown_timeout(GRACEFUL_SHUTDOWN_TIMEOUT);
-            res
-        });
+        let server_task = tokio::spawn(Self::run_jsonrpsee_server(
+            rpc,
+            transport,
+            stop_receiver,
+            local_addr_sender,
+            health_updater,
+            vm_barrier,
+            batch_request_config,
+            response_body_size_limit,
+            subscriptions_limit,
+            websocket_requests_per_minute_limit,
+        ));
 
         let local_addr = match local_addr.await {
             Ok(addr) => addr,
